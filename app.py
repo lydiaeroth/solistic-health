@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 END_DATE = datetime(2025, 9, 8)
 
 app = Flask(__name__)
-DB_Path = "/Users/lydiaroth/Desktop/Solistic/data/dummy_health_data.db"
+DB_Path = "data/dummy_health_data.db"
 
 # ---------------- Utility function for fetching and resampling ----------------
 def fetch_and_resample(data_type, start_date, freq, agg="mean", smoothing=1):
