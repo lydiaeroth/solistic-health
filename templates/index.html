@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Health Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+      // --- Global Chart.js Defaults ---
+      Chart.defaults.plugins.legend.labels.usePointStyle = true;
+      Chart.defaults.plugins.legend.labels.pointStyle = "circle";
+      Chart.defaults.plugins.legend.labels.padding = 20;
+      Chart.defaults.plugins.legend.labels.font = {
+        family: "Roboto",
+        size: 14
+      };
+
+      // --- Global Color Palette ---
+      const chartColors = {
+        glucose: "#40e0d0",          // turquoise
+        steps: "#a086d3",            // dark purple
+        heart_rate: "#ff6f61",       // coral
+        walking_distance: "#008080", // dark teal
+        calories: "#00293b"          // navy blue
+  };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* Font styles */
+
+    /* Container spacing */
+    body {
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .dashboard-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 16.6%; /* ~1/6 of page width on each side */
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-container {
+        padding: 0 8%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .dashboard-container {
+        padding: 0 5%;
+      }
+    }
+
+    /* Title */
+    .dashboard-title {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 40px;
+      color: #2c3e50;
+      letter-spacing: 1px;
+    }
+
+    /* Chart card styling */
+    .chart-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    .chart-title {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 400;
+      color: #2c3e50;
+      letter-spacing: 1px;
+    }
+
+    .chart-card canvas {
+      width: 100% !important;
+      height: 500px !important;
+    }
+
+    /* Range selectors */
+    .range-selector {
+      display: flex;       /* force it to stack above chart */
+      align-items: center;
+      justify-content: flex-start;
+      margin-bottom: 10px;
+      gap: 8px; /* small space between label and dropdown */
+    }
+
+    .range-selector label {
+      display: inline-flex;
+      font-weight: 600;
+      color: #2c3e50;
+      white-space: nowrap;
+    }
+
+    .range-selector select {
+      padding: 6px 10px;
+      font-size: 0.95rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background-color: #fff;
+      max-width: 180px; /* keeps it from getting too wide */
+    }
+
+    .range-selector select:focus {
+      border-color: #3498db;
+      outline: none;
+      box-shadow: 0 0 4px rgba(52, 152, 219, 0.5);
+    }
+
+    .range-selector select:hover {
+      border-color: #3498db;
+    }
+
+  </style>
+</head>
+<body class="dashboard-container">
+  <h1 class="dashboard-title">Glucose Monitoring Dashboard</h1>
+  <p>I created this proof-of-concept health dashboard to solve a gap in Type 1 diabetes management: understanding how various lifestyle and environmental factors impact blood sugar levels. While I have access to glucose monitoring technology (Dexcom) and can track physical health metrics through devices like smartwatches, fitness rings, Garmin devices, and Apple Health, there is currently no way to see how these different data streams connect to my glucose patterns. </p>
+  <p>This dashboard bridges that gap by overlaying multiple health data sources onto my glucose monitoring, revealing insights that would otherwise remain hidden—like how changes in elevation, sleep quality, exercise intensity, or stress levels uniquely affect my blood sugar. Visualizing these relationships over time can lead to better diabetes management, anticipate glucose fluctuations, and ultimately achieve better health outcomes through a more complete understanding of my body's individual responses to daily life.</p>
+  <p><i><b>This is still very much a work in progress! Charts and UX are rudimentary, data is limited and not yet real-time. More health tracking underway as well as development that will make it more robust.</b></i></p>
+
+  <!-- Chart 1 -->
+  <div class="chart-card">
+    <h2 class="chart-title">Glucose & Steps by Hour</h2>
+    <div class="range-selector">
+      <label for="chart1Range">Range:</label>
+      <select id="chart1Range" onchange="updateChart1()">
+        <option value="24h">Past 24 hours</option>
+        <option value="3d">Past 3 days</option>
+        <option value="2w">Past 2 weeks</option>
+      </select>
+    </div>
+    <canvas id="chart1"></canvas>
+  </div>
+
+  <!-- Chart 2 -->
+  <div class="chart-card">
+    <h2 class="chart-title">Heart Rate & Glucose (12 months)</h2>
+    <canvas id="chart2"></canvas>
+  </div>
+
+  <!-- Chart 3 -->
+  <div class="chart-card">
+    <h2 class="chart-title">Walking/Running Distance & Glucose</h2>
+    <div class="range-selector">
+      <label for="chart3Range">Range:</label>
+      <select id="chart3Range" onchange="updateChart3()">
+        <option value="14d">Past 14 days</option>
+        <option value="1m">Past month</option>
+        <option value="3m">Past 3 months</option>
+        <option value="6m">Past 6 months</option>
+      </select>
+    </div>
+    <canvas id="chart3"></canvas>
+  </div>
+
+  <!-- Chart 4 -->
+  <div class="chart-card">
+    <h2 class="chart-title">Calories Burned & Glucose</h2>
+    <div class="range-selector">
+      <label for="chart4Range">Range:</label>
+      <select id="chart4Range" onchange="updateChart4()">
+        <option value="14d">Past 14 days</option>
+        <option value="1m">Past month</option>
+        <option value="3m">Past 3 months</option>
+        <option value="6m">Past 6 months</option>
+      </select>
+    </div>
+    <canvas id="chart4"></canvas>
+  </div>
+</div>
+
+<script>
+let chart1, chart2, chart3, chart4;
+
+// ---------------- Chart 1 ----------------
+async function fetchChart1() {
+  const range = document.getElementById("chart1Range").value;
+  const res = await fetch(`/chart1?range=${range}`);
+  return await res.json();
+}
+
+async function renderChart1() {
+  const data = await fetchChart1();
+  const ctx = document.getElementById("chart1").getContext("2d");
+
+  const stepsValues = data.steps;
+
+  // Compute min and max for scaling
+  let stepsMin = Math.min(...stepsValues);
+  let stepsMax = Math.max(...stepsValues);
+
+  // Add padding of 1000 above/below
+  stepsMin = Math.max(0, stepsMin - 1000);  // don’t go below 0
+  stepsMax = stepsMax + 1000;
+  
+
+  chart1 = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [
+        { 
+          label: 'Glucose', 
+          data: data.glucose, 
+          borderColor: chartColors.glucose,
+          backgroundColor: chartColors.glucose, 
+          tension: 0.4,  
+          yAxisID: 'yLeft',
+          pointRadius: 3
+        },
+        { 
+          label: 'Steps', 
+          data: data.steps, 
+          borderColor: chartColors.steps,
+          backgroundColor: chartColors.steps, 
+          tension: 0.4, 
+          yAxisID: 'yRight',
+          pointRadius: 3
+        }
+      ]
+    },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { usePointStyle: true, pointStyle: 'circle' }
+          },
+          tooltip: {
+            enabled: true,
+            mode: 'nearest',
+            intersect: false,
+            callbacks: {
+              label: function(context) {
+                const datasetLabel = context.dataset.label;
+                const value = context.parsed.y;
+                let unit = '';
+                if (datasetLabel === 'Glucose') unit = 'mg/dL';
+                if (datasetLabel === 'Steps') unit = 'count';
+                return `${datasetLabel}: ${value} ${unit}`;
+              },
+              title: function(context) {
+                return context[0].label; // full timestamp
+              }
+            }
+          }
+        },
+        interaction: {
+          mode: 'nearest',
+          intersect: false
+        },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Hour',
+            font: { size: 14, family: 'Roboto' }
+          },
+          ticks: {
+            callback: function(value, index, ticks) {
+              const label = this.getLabelForValue(value); // full timestamp
+              // Only show label if hour is 00
+              if (label.endsWith('00:00')) {
+                return label.split(' ')[0];  // show only date, e.g., "2025-09-08"
+              } else {
+                return '';  // otherwise, hide tick
+              }
+            }
+          }
+        },
+        yLeft: {
+          type: 'linear',
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Glucose (mg/dL)',
+            font: { size: 14, family: 'Roboto' }
+          },
+          beginAtZero: false
+        },
+        yRight: {
+          type: 'linear',
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Steps (count)',
+            font: { size: 14, family: 'Roboto' }
+          },
+          grid: { drawOnChartArea: false },
+          min: stepsMin,
+          max: stepsMax
+        }
+      }
+    }
+  });
+}
+
+async function updateChart1() {
+  const data = await fetchChart1();
+  chart1.data.labels = data.labels;
+  chart1.data.datasets[0].data = data.glucose;
+  chart1.data.datasets[1].data = data.steps;
+  chart1.update();
+}
+
+// ---------------- Chart 2 ----------------
+async function fetchChart2() {
+  const res = await fetch("/chart2");
+  return await res.json();
+}
+async function renderChart2() {
+  try {
+    // 1️⃣ Fetch data from Flask endpoint
+    const response = await fetch("/chart2");
+    const ctx2 = document.getElementById("chart2").getContext("2d");
+
+
+    // 2️⃣ Extract JSON and assign variables
+    const data = await response.json();
+    const labels = data.labels;
+    const glucoseData = data.glucose;      // must match 'glucose' from Flask
+    const hrData = data.heart_rate;        // must match 'heart_rate' from Flask
+
+    // 3️⃣ Use these variables to create/update Chart.js chart
+    if (chart2) {
+      chart2.destroy();
+    }
+
+    chart2 = new Chart(ctx2, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Glucose (mg/dL)",
+            data: glucoseData,
+            borderColor: chartColors.glucose,
+            backgroundColor: chartColors.glucose,
+            fill: false,
+            yAxisID: "yLeft",
+            tension: 0.4 
+          },
+          {
+            label: "Heart Rate (bpm)",
+            data: hrData,
+            borderColor: chartColors.heart_rate,
+            backgroundColor: chartColors.heart_rate,
+            fill: false,
+            yAxisID: "yRight",
+            tension: 0.4 
+          }
+        ]
+      },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { usePointStyle: true, pointStyle: 'circle' }
+          },
+          tooltip: {
+            enabled: true,
+            mode: 'nearest',
+            intersect: false,
+            callbacks: {
+              label: function(context) {
+                const datasetLabel = context.dataset.label;
+                const value = context.parsed.y;
+                let unit = '';
+                if (datasetLabel === 'Glucose') unit = 'mg/dL';
+                if (datasetLabel === 'heart_rate') unit = 'bpm';
+                return `${datasetLabel}: ${value} ${unit}`;
+              },
+              title: function(context) {
+                return context[0].label; // full timestamp
+              }
+            }
+          }
+        },
+        interaction: {
+          mode: 'nearest',
+          intersect: false
+        },
+        scales: {
+          x: {
+                title: {
+                    display: true,
+                    text: 'Date',          // X-axis label
+                    font: { size: 14, family: 'Roboto' }
+                }
+            },
+            yLeft: {
+                type: 'linear',
+                position: 'left',
+                title: {
+                    display: true,
+                    text: 'Glucose (mg/dL)', // Left Y-axis label
+                    font: { size: 14, family: 'Roboto' }
+                }
+            },
+            yRight: {
+                type: 'linear',
+                position: 'right',
+                title: {
+                    display: true,
+                    text: 'Heart Rate (bpm)', // Right Y-axis label
+                    font: { size: 14, family: 'Roboto' }
+                },
+                grid: {
+                    drawOnChartArea: false   // prevents grid lines on right axis
+                }
+            }
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Failed to load chart2 data:", error);
+  }
+}
+
+
+// ---------------- Chart 3 ----------------
+async function fetchChart3() {
+  const range = document.getElementById("chart3Range").value;
+  const res = await fetch(`/chart3?range=${range}`);
+  return await res.json();
+}
+
+async function renderChart3() {
+  const data = await fetchChart3();
+  const ctx = document.getElementById("chart3").getContext("2d");
+
+  chart3 = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [
+        {
+          label: 'Glucose',
+          data: data.glucose,
+          borderColor: chartColors.glucose,
+          backgroundColor: chartColors.glucose,
+          tension: 0.4,
+          yAxisID: 'yLeft'
+        },
+        {
+          label: 'Walking/Running Distance',
+          data: data.distance,
+          borderColor: chartColors.distance,
+          backgroundColor: chartColors.distance,
+          tension: 0.4,
+          yAxisID: 'yRight'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { usePointStyle: true, pointStyle: 'circle' }
+        },
+        tooltip: {
+          enabled: true,
+          mode: 'nearest',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              const datasetLabel = context.dataset.label || '';
+              let value = context.parsed.y;
+              let unit = '';
+
+              if (datasetLabel.toLowerCase().includes('glucose')) {
+                unit = 'mg/dL';
+                value = Number(value).toFixed(1);   // glucose to 1 decimal
+              } else if (datasetLabel.toLowerCase().includes('distance')) {
+                unit = 'mi';
+                value = Number(value).toFixed(2);   // distance to 2 decimals
+              }
+
+              return `${datasetLabel}: ${value} ${unit}`;
+            },
+            title: function(context) {
+              return context[0].label; // full date string
+            }
+          }
+        }
+      },
+      interaction: {
+        mode: 'nearest',
+        intersect: false
+      },
+      scales: {
+        x: {
+          title: { 
+            display: true, 
+            text: 'Date', 
+            font: { size: 14, family: 'Roboto' } 
+          }
+        },
+        yLeft: {
+          type: 'linear',
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Glucose (mg/dL)',
+            font: { size: 14, family: 'Roboto' }
+          },
+          beginAtZero: false
+        },
+        yRight: {
+          type: 'linear',
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Walking/Running Distance (mi)',
+            font: { size: 14, family: 'Roboto' }
+          },
+          grid: { drawOnChartArea: false },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+async function updateChart3() {
+  const data = await fetchChart3();
+  chart3.data.labels = data.labels;
+  chart3.data.datasets[0].data = data.glucose;
+  chart3.data.datasets[1].data = data.distance;
+  chart3.update();
+}
+
+
+// ---------------- Chart 4 ----------------
+async function fetchChart4() {
+  const range = document.getElementById("chart4Range").value;
+  const res = await fetch(`/chart4?range=${range}`);
+  return await res.json();
+}
+
+async function renderChart4() {
+  const data = await fetchChart4();
+  const ctx = document.getElementById("chart4").getContext("2d");
+
+  chart4 = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [
+        {
+          label: 'Glucose',
+          data: data.glucose,
+          borderColor: chartColors.glucose,
+          backgroundColor: chartColors.glucose,
+          tension: 0.4,
+          yAxisID: 'yLeft'
+        },
+        {
+          label: 'Calories Burned',
+          data: data.calories,
+          borderColor: chartColors.calories,
+          backgroundColor: chartColors.calories,
+          tension: 0.4,
+          yAxisID: 'yRight'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { usePointStyle: true, pointStyle: 'circle' }
+        },
+        tooltip: {
+          enabled: true,
+          mode: 'nearest',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              const datasetLabel = context.dataset.label || '';
+              let value = context.parsed.y;
+              let unit = '';
+
+              if (datasetLabel.toLowerCase().includes('glucose')) {
+                unit = 'mg/dL';
+                value = Number(value).toFixed(1);
+              } else if (datasetLabel.toLowerCase().includes('calories')) {
+                unit = 'cal';
+                value = Math.round(value); // calories whole numbers
+              }
+
+              return `${datasetLabel}: ${value} ${unit}`;
+            },
+            title: function(context) {
+              return context[0].label; // full date
+            }
+          }
+        }
+      },
+      interaction: { mode: 'nearest', intersect: false },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Date',
+            font: { size: 14, family: 'Roboto' }
+          }
+        },
+        yLeft: {
+          type: 'linear',
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Glucose (mg/dL)',
+            font: { size: 14, family: 'Roboto' }
+          }
+        },
+        yRight: {
+          type: 'linear',
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Calories (cal)',
+            font: { size: 14, family: 'Roboto' }
+          },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+}
+
+async function updateChart4() {
+  const data = await fetchChart4();
+  chart4.data.labels = data.labels;
+  chart4.data.datasets[0].data = data.glucose;
+  chart4.data.datasets[1].data = data.calories;
+  chart4.update();
+}
+
+// ---------- render all charts --------- 
+
+async function init() {
+  await renderChart1();
+  await renderChart2();
+  await renderChart3();
+  await renderChart4();
+}
+
+init();
+</script>
+</body>
+</html>
