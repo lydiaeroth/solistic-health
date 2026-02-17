@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blood Glucose Monitoring Dashboard</title>
+
+  <!-- Apache ECharts -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+  <!-- Inter font (dashboard-optimized, high legibility at small sizes) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ===================================================================
+       CSS Design System
+       Mixpanel-inspired light theme with card-based layout.
+       Color palette: blues, purples, oranges on a light gray background.
+       =================================================================== */
+
+    :root {
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.08);
+      --card-radius: 12px;
+      --text-primary: #1E293B;
+      --text-secondary: #64748B;
+      --border: #E2E8F0;
+      --glucose-orange: #F28C38;
+      --max-width: 1200px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    /* ---- Layout container ---- */
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 32px 40px;
+    }
+    @media (max-width: 768px)  { .container { padding: 20px 16px; } }
+
+    /* ---- Header ---- */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .header-description {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+      max-width: 800px;
+    }
+
+    /* ---- Upload button ---- */
+    .btn-upload {
+      padding: 8px 16px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card-bg);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-upload:hover { border-color: #94A3B8; box-shadow: var(--card-shadow); }
+
+    /* ---- Global time range picker (pill buttons) ---- */
+    .time-range-picker {
+      display: inline-flex;
+      gap: 2px;
+      margin-bottom: 24px;
+      background: var(--card-bg);
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .time-range-picker button {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+    .time-range-picker button:hover { color: var(--text-primary); }
+    .time-range-picker button.active {
+      background: var(--text-primary);
+      color: #FFFFFF;
+    }
+
+    /* ---- Snapshot cards ---- */
+    .snapshot-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+    .snapshot-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 640px) { .snapshot-cards { grid-template-columns: 1fr; } }
+    .snapshot-card {
+      background: var(--card-bg);
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
+      padding: 20px 24px;
+      border: 1px solid var(--border);
+    }
+    .snapshot-card .label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .snapshot-card .value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-top: 4px;
+      line-height: 1.1;
+    }
+    .snapshot-card .unit {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-left: 2px;
+    }
+    .snapshot-card .subtext {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* ---- Chart groups ---- */
+    .chart-group {
+      margin-bottom: 32px;
+    }
+    .chart-group-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .chart-grid {
+      display: grid;
+      gap: 16px;
+    }
+    .chart-grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .chart-grid-3 { grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 900px) {
+      .chart-grid-2, .chart-grid-3 { grid-template-columns: 1fr; }
+    }
+
+    /* ---- Chart cards ---- */
+    .chart-card {
+      background: var(--card-bg);
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
+      padding: 20px;
+      border: 1px solid var(--border);
+      transition: box-shadow 0.2s ease;
+    }
+    .chart-card:hover { box-shadow: var(--card-shadow-hover); }
+    .chart-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+    .chart-container {
+      width: 100%;
+      height: 280px;
+    }
+
+    /* Full-width charts (single column) */
+    .chart-card-full .chart-container {
+      height: 320px;
+    }
+
+    /* ---- Upload modal ---- */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+    .modal-content {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 32px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+      position: relative;
+    }
+    .modal-content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .modal-content .modal-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-close:hover { background: #F1F5F9; }
+
+    /* Form elements */
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+    .form-group input[type="password"] {
+      width: 100%;
+      padding: 10px 12px;
+      font-family: var(--font);
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-group input:focus { border-color: #94A3B8; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 32px 20px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 16px;
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+    .drop-zone.drag-over {
+      border-color: var(--glucose-orange);
+      background: #FFF7ED;
+    }
+    .drop-zone p { margin: 4px 0; }
+    .drop-zone .browse-btn {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 6px 14px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      background: #F1F5F9;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .drop-zone .browse-btn:hover { background: #E2E8F0; }
+    .file-name {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-top: 8px;
+    }
+
+    /* Progress bar */
+    .progress-bar {
+      height: 4px;
+      background: #E2E8F0;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--glucose-orange);
+      border-radius: 2px;
+      width: 0%;
+      animation: progress-indeterminate 1.5s ease-in-out infinite;
+    }
+    @keyframes progress-indeterminate {
+      0%   { width: 0%; margin-left: 0; }
+      50%  { width: 60%; margin-left: 20%; }
+      100% { width: 0%; margin-left: 100%; }
+    }
+    .upload-status {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .upload-status.success { color: #059669; }
+    .upload-status.error { color: #DC2626; }
+
+    /* Submit button */
+    .btn-primary {
+      width: 100%;
+      padding: 10px;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background: var(--text-primary);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ---- About section ---- */
+    .about-section {
+      margin-top: 16px;
+      margin-bottom: 48px;
+    }
+    .about-card {
+      background: var(--card-bg);
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
+      padding: 32px 36px;
+      border: 1px solid var(--border);
+    }
+    .about-card h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .about-card p {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+    .about-card p:last-child { margin-bottom: 0; }
+    .about-card .tech-label {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
+      background: #F1F5F9;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+    .about-tech {
+      margin-top: 12px;
+    }
+
+    /* ---- Empty state ---- */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+    .empty-state h2 { font-size: 18px; margin-bottom: 8px; color: var(--text-primary); }
+    .empty-state p { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ================================================================
+         Header: Title + Upload button
+         ================================================================ -->
+    <div class="header">
+      <h1>Blood Glucose Monitoring Dashboard</h1>
+      <button class="btn-upload" onclick="openUploadModal()">Upload Data</button>
+    </div>
+    <p class="header-description">
+      A health dashboard for Type 1 diabetes management. Overlays blood glucose
+      data from a Dexcom G7 CGM with activity, cardio, cycling, and movement
+      metrics from Apple Health to reveal how lifestyle factors impact blood
+      sugar levels.
+    </p>
+
+    <!-- ================================================================
+         Global time range picker
+         Controls all charts simultaneously.
+         ================================================================ -->
+    <div class="time-range-picker" id="timeRangePicker">
+      <button data-range="24h" onclick="switchRange('24h')">24h</button>
+      <button data-range="7d"  onclick="switchRange('7d')" class="active">7d</button>
+      <button data-range="14d" onclick="switchRange('14d')">14d</button>
+      <button data-range="30d" onclick="switchRange('30d')">30d</button>
+      <button data-range="3mo" onclick="switchRange('3mo')">3mo</button>
+      <button data-range="6mo" onclick="switchRange('6mo')">6mo</button>
+    </div>
+
+    <!-- ================================================================
+         Today's Snapshot — summary cards
+         Shows the latest glucose reading, total steps, and exercise minutes.
+         ================================================================ -->
+    <div class="snapshot-section-title">Snapshot</div>
+    <div class="snapshot-cards">
+      <div class="snapshot-card">
+        <div class="label">Avg Glucose</div>
+        <div class="value">
+          <span id="snapshotGlucose" style="color: var(--glucose-orange);">--</span>
+          <span class="unit">mg/dL</span>
+        </div>
+        <div class="subtext" id="snapshotRange"></div>
+      </div>
+      <div class="snapshot-card">
+        <div class="label">Avg Daily Steps</div>
+        <div class="value">
+          <span id="snapshotSteps" style="color: #4A90D9;">--</span>
+        </div>
+        <div class="subtext">per day</div>
+      </div>
+      <div class="snapshot-card">
+        <div class="label">Avg Exercise Minutes</div>
+        <div class="value">
+          <span id="snapshotExercise" style="color: #10B981;">--</span>
+          <span class="unit">min</span>
+        </div>
+        <div class="subtext">per day</div>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         Chart Group 1: Glucose + Activity
+         Steps, Exercise Minutes, Active Calories — each with glucose overlay
+         ================================================================ -->
+    <div class="chart-group">
+      <div class="chart-group-title">Activity</div>
+      <div class="chart-grid chart-grid-3">
+        <div class="chart-card">
+          <div class="chart-card-title">Steps</div>
+          <div class="chart-container" id="chartSteps"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Exercise Minutes</div>
+          <div class="chart-container" id="chartExercise"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Active Calories</div>
+          <div class="chart-container" id="chartActiveCal"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         Chart Group 2: Glucose + Cardio
+         Heart Rate and Resting Energy — each with glucose overlay
+         ================================================================ -->
+    <div class="chart-group">
+      <div class="chart-group-title">Metabolism</div>
+      <div class="chart-grid chart-grid-2">
+        <div class="chart-card">
+          <div class="chart-card-title">Heart Rate</div>
+          <div class="chart-container" id="chartHeartRate"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Resting Energy</div>
+          <div class="chart-container" id="chartRestingEnergy"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         Chart Group 3: Cycling + Running
+         Cycling Distance and Walking + Running Distance with glucose,
+         plus placeholder cards for Cycling Power and Speed.
+         ================================================================ -->
+    <div class="chart-group">
+      <div class="chart-group-title">Cycling + Running</div>
+      <div class="chart-grid chart-grid-2">
+        <div class="chart-card">
+          <div class="chart-card-title">Cycling Distance</div>
+          <div class="chart-container" id="chartCyclingDist"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Walking + Running Distance</div>
+          <div class="chart-container" id="chartWalkDist"></div>
+        </div>
+      </div>
+      <div class="chart-grid chart-grid-2" style="margin-top: 16px;">
+        <div class="chart-card">
+          <div class="chart-card-title">Cycling Power</div>
+          <div class="chart-container" id="chartCyclingPower"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Cycling Speed</div>
+          <div class="chart-container" id="chartCyclingSpeed"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         About Section
+         Explains why this dashboard exists and how it works technically.
+         ================================================================ -->
+    <div class="about-section">
+      <div class="chart-group-title">About</div>
+      <div class="about-card">
+        <div class="chart-card-title">Why This Dashboard Exists</div>
+        <p>
+          Smart watches, fitness rings, Garmin devices, Apple Health&mdash;everything we track
+          through these apps affects blood sugar, yet the data is disparate. This dashboard was born
+          out of the desire to better understand how each of these factors affects glucose over time.
+        </p>
+        <p>
+          What are the next-day effects of intense activity on blood sugar? How does caloric intake
+          affect blood sugar 2 hours after a meal? 2 days after? How does cycling affect blood sugar
+          differently than walking or running?
+        </p>
+        <p>
+          The relationship between these lifestyle factors is different for everyone. Once we know
+          how they work, we can take the guesswork out of personalized prediction and adjustments to
+          basal rates, insulin-to-carb ratios, and insulin sensitivity.
+        </p>
+
+        <div class="chart-card-title">How It Works</div>
+        <p>
+          Health data is exported from Apple Health and uploaded here as an XML file with hundreds of
+          thousands of health records from every connected device&mdash;Dexcom G7 CGM, Garmin
+          wearables, iPhone sensors, and more.
+        </p>
+        <p>
+          On the backend, a Python Flask application parses the file and loads the data into a SQL
+          database. A single API endpoint serves all chart data for the selected time range. The
+          frontend uses Apache ECharts to render dual-axis line charts, with blood glucose as the
+          orange reference line on every chart. A global time range picker controls all charts
+          simultaneously, and the entire dashboard loads from a single API call.
+        </p>
+
+        <div class="about-tech">
+          <span class="tech-label">Python</span>
+          <span class="tech-label">Flask</span>
+          <span class="tech-label">SQLite</span>
+          <span class="tech-label">pandas</span>
+          <span class="tech-label">Apache ECharts</span>
+          <span class="tech-label">Apple HealthKit</span>
+          <span class="tech-label">Dexcom G7</span>
+          <span class="tech-label">Render</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end .container -->
+
+  <!-- ==================================================================
+       Upload Modal
+       Password-protected drag-and-drop file upload for Apple Health
+       export.zip files. Hidden by default, shown when user clicks
+       "Upload Data" button.
+       ================================================================== -->
+  <div class="modal-overlay" id="uploadModal" style="display:none;">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+      <h2>Upload Health Data</h2>
+      <p class="modal-desc">
+        Upload your Apple Health <strong>export.zip</strong> file.
+        This will replace all existing data in the dashboard.
+      </p>
+      <form id="uploadForm" onsubmit="handleUpload(event)">
+        <div class="form-group">
+          <label for="uploadPassword">Password</label>
+          <input type="password" id="uploadPassword" required placeholder="Enter upload password">
+        </div>
+        <div class="drop-zone" id="dropZone">
+          <p>Drag & drop your export.zip here</p>
+          <p style="font-size:12px; color:#94A3B8;">or</p>
+          <input type="file" id="fileInput" accept=".zip" style="display:none">
+          <button type="button" class="browse-btn" onclick="document.getElementById('fileInput').click()">
+            Browse Files
+          </button>
+          <p class="file-name" id="fileName"></p>
+        </div>
+        <div id="uploadProgress" style="display:none;">
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          <p class="upload-status" id="uploadStatus">Uploading and parsing... this may take a few minutes.</p>
+        </div>
+        <button type="submit" class="btn-primary" id="submitBtn">Upload & Import</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================================================================
+       JavaScript
+       Handles data fetching, chart rendering, time range switching,
+       file upload, and drag-and-drop.
+       ================================================================== -->
+  <script>
+    /* ==================================================================
+       Color Palette
+       Orange is reserved for glucose (appears on every chart).
+       Blues for step/distance metrics, purples for energy, teal for
+       exercise, coral for heart rate.
+       ================================================================== */
+    const COLORS = {
+      glucose:          "#F28C38",  // warm orange — primary reference line
+      steps:            "#4A90D9",  // medium blue
+      walkRunDistance:   "#2E6EB5",  // deep blue
+      cyclingDistance:   "#1B4F8A",  // navy blue
+      activeCalories:   "#8B5CF6",  // vivid purple
+      restingEnergy:    "#A78BFA",  // light purple
+      heartRate:        "#E05C6F",  // coral red
+      exerciseMinutes:  "#10B981",  // teal green
+      placeholder:      "#CBD5E1",  // slate gray for "no data" state
+      textSecondary:    "#64748B",
+      gridLine:         "#F1F5F9",
+      border:           "#E2E8F0",
+    };
+
+    /* ==================================================================
+       State
+       ================================================================== */
+    const charts = {};          // all ECharts instances, keyed by container ID
+    let currentRange = "7d";    // current global time range
+
+    /* ==================================================================
+       Chart Factory: createDualAxisChart()
+       Creates a dual-Y-axis ECharts line chart with glucose as the
+       orange reference line on the left axis and one or more metrics
+       on the right axis.
+
+       @param {string}   containerId  - DOM element ID
+       @param {string[]} labels       - X-axis time labels
+       @param {object}   glucoseData  - {values, name, unit}
+       @param {object[]} rightMetrics - [{values, name, unit, color, showArea}]
+       @returns {ECharts} chart instance
+       ================================================================== */
+    function createDualAxisChart(containerId, labels, glucoseData, rightMetrics) {
+      const container = document.getElementById(containerId);
+      if (!container) return null;
+
+      // Dispose existing chart if re-rendering
+      if (charts[containerId]) {
+        charts[containerId].dispose();
+      }
+
+      const chart = echarts.init(container);
+
+      // Build series array — glucose first, then right-axis metrics
+      // All series get subtle gradient shading under the line
+      const series = [
+        {
+          name: glucoseData.name || "Glucose",
+          type: "line",
+          yAxisIndex: 0,
+          data: glucoseData.values,
+          itemStyle:  { color: COLORS.glucose },
+          lineStyle:  { color: COLORS.glucose, width: 2 },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: COLORS.glucose + "20" },
+            { offset: 1, color: COLORS.glucose + "05" },
+          ])},
+          symbol: "none",
+          smooth: false,
+          connectNulls: false,  // CRITICAL: breaks line at gaps
+        },
+      ];
+
+      rightMetrics.forEach(metric => {
+        series.push({
+          name: metric.name,
+          type: "line",
+          yAxisIndex: 1,
+          data: metric.values,
+          itemStyle: { color: metric.color },
+          lineStyle: { color: metric.color, width: 2 },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: metric.color + "20" },
+            { offset: 1, color: metric.color + "05" },
+          ])},
+          symbol: "none",
+          smooth: false,
+          connectNulls: false,  // CRITICAL: gaps visible
+        });
+      });
+
+      // Determine right axis label from the first right metric
+      const rightLabel = rightMetrics.length > 0
+        ? `${rightMetrics[0].name} (${rightMetrics[0].unit})`
+        : "";
+
+      const option = {
+        tooltip: {
+          trigger: "axis",
+          backgroundColor: "#FFFFFF",
+          borderColor: COLORS.border,
+          borderWidth: 1,
+          textStyle: { fontFamily: "Inter", fontSize: 12, color: "#1E293B" },
+          /* Custom tooltip formatter: shows each series value with its unit */
+          formatter: function(params) {
+            let html = '<div style="font-weight:600; margin-bottom:4px;">' + params[0].axisValueLabel + '</div>';
+            params.forEach(p => {
+              if (p.value != null) {
+                const metric = (p.seriesName === "Glucose")
+                  ? { unit: "mg/dL" }
+                  : rightMetrics.find(m => m.name === p.seriesName) || { unit: "" };
+                html += '<div style="display:flex; align-items:center; gap:6px; margin:2px 0;">'
+                  + p.marker
+                  + '<span>' + p.seriesName + ': <strong>' + p.value + '</strong> ' + metric.unit + '</span>'
+                  + '</div>';
+              }
+            });
+            return html;
+          },
+        },
+        legend: {
+          top: 0,
+          textStyle: { fontFamily: "Inter", fontSize: 11, color: COLORS.textSecondary },
+          itemWidth: 16,
+          itemHeight: 8,
+          itemGap: 16,
+        },
+        grid: {
+          left: 45,
+          right: 45,
+          top: 45,
+          bottom: 20,
+        },
+        xAxis: {
+          type: "category",
+          data: labels,
+          axisLine: { lineStyle: { color: COLORS.border } },
+          axisTick: { show: false },
+          axisLabel: {
+            fontFamily: "Inter",
+            fontSize: 10,
+            color: COLORS.textSecondary,
+            /* Smart label formatting: hours for 24h, MM/DD for longer ranges */
+            formatter: function(val) {
+              if (currentRange === "24h" && val.includes(" ")) {
+                var timePart = val.split(" ")[1];
+                var hour = parseInt(timePart.split(":")[0]);
+                if (hour === 0) return "12am";
+                if (hour === 12) return "12pm";
+                return hour > 12 ? (hour - 12) + "pm" : hour + "am";
+              }
+              var datePart = val.includes(" ") ? val.split(" ")[0] : val;
+              var parts = datePart.split("-");
+              if (parts.length === 3) return parts[1] + "/" + parts[2];
+              return datePart;
+            },
+            interval: function(index, value) {
+              /* Show ~6-8 labels regardless of data density */
+              const total = labels.length;
+              const step = Math.max(1, Math.floor(total / 7));
+              return index % step === 0;
+            },
+          },
+          splitLine: { show: false },
+        },
+        yAxis: [
+          /* Left Y-axis: Glucose (always orange) */
+          {
+            type: "value",
+            name: "Glucose (mg/dL)",
+            nameTextStyle: { fontFamily: "Inter", fontSize: 10, color: COLORS.glucose },
+            axisLabel: { fontFamily: "Inter", fontSize: 10, color: COLORS.textSecondary },
+            splitLine: { lineStyle: { color: COLORS.gridLine, type: "dashed" } },
+            axisLine: { show: false },
+            axisTick: { show: false },
+          },
+          /* Right Y-axis: secondary metric(s) */
+          {
+            type: "value",
+            name: rightLabel,
+            nameTextStyle: { fontFamily: "Inter", fontSize: 10, color: COLORS.textSecondary },
+            axisLabel: { fontFamily: "Inter", fontSize: 10, color: COLORS.textSecondary },
+            splitLine: { show: false },
+            axisLine: { show: false },
+            axisTick: { show: false },
+          },
+        ],
+        series: series,
+        /* Subtle animation on load */
+        animationDuration: 600,
+        animationEasing: "cubicOut",
+      };
+
+      chart.setOption(option);
+      charts[containerId] = chart;
+      return chart;
+    }
+
+    /* ==================================================================
+       Placeholder Chart
+       Renders a "No data available" message for metrics that don't
+       have any data yet (cycling power, cycling speed).
+       ================================================================== */
+    function renderPlaceholderChart(containerId, metricName) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      if (charts[containerId]) {
+        charts[containerId].dispose();
+      }
+
+      const chart = echarts.init(container);
+      chart.setOption({
+        graphic: [{
+          type: "group",
+          left: "center",
+          top: "middle",
+          children: [
+            {
+              type: "text",
+              style: {
+                text: "No data available",
+                fontFamily: "Inter",
+                fontSize: 14,
+                fontWeight: 500,
+                fill: COLORS.placeholder,
+                textAlign: "center",
+              },
+            },
+            {
+              type: "text",
+              style: {
+                text: "Data will appear once recorded to Apple Health",
+                fontFamily: "Inter",
+                fontSize: 11,
+                fill: COLORS.placeholder,
+                textAlign: "center",
+                y: 24,
+              },
+            },
+          ],
+        }],
+        xAxis: { show: false },
+        yAxis: { show: false },
+      });
+
+      charts[containerId] = chart;
+    }
+
+    /* ==================================================================
+       Render All Charts
+       Takes the full data payload from /api/data and renders all 10
+       chart cards. Called on page load and when the time range changes.
+       ================================================================== */
+    function renderAllCharts(data) {
+      /* --- Group 1: Glucose + Activity --- */
+      createDualAxisChart("chartSteps", data.labels,
+        { values: data.glucose, name: "Glucose", unit: "mg/dL" },
+        [{ values: data.steps, name: "Steps", unit: "count", color: COLORS.steps, showArea: true }]
+      );
+
+      createDualAxisChart("chartExercise", data.labels,
+        { values: data.glucose, name: "Glucose", unit: "mg/dL" },
+        [{ values: data.exercise_minutes, name: "Exercise", unit: "min", color: COLORS.exerciseMinutes, showArea: true }]
+      );
+
+      createDualAxisChart("chartActiveCal", data.labels,
+        { values: data.glucose, name: "Glucose", unit: "mg/dL" },
+        [{ values: data.active_calories, name: "Active Cal", unit: "Cal", color: COLORS.activeCalories, showArea: true }]
+      );
+
+      /* --- Group 2: Glucose + Cardio --- */
+      createDualAxisChart("chartHeartRate", data.labels,
+        { values: data.glucose, name: "Glucose", unit: "mg/dL" },
+        [{ values: data.heart_rate, name: "Heart Rate", unit: "bpm", color: COLORS.heartRate }]
+      );
+
+      createDualAxisChart("chartRestingEnergy", data.labels,
+        { values: data.glucose, name: "Glucose", unit: "mg/dL" },
+        [{ values: data.resting_energy, name: "Resting Energy", unit: "Cal", color: COLORS.restingEnergy, showArea: true }]
+      );
+
+      /* --- Group 3: Cycling + Running --- */
+      createDualAxisChart("chartCyclingDist", data.labels,
+        { values: data.glucose, name: "Glucose", unit: "mg/dL" },
+        [{ values: data.cycling_distance, name: "Cycling Dist", unit: "mi", color: COLORS.cyclingDistance }]
+      );
+
+      createDualAxisChart("chartWalkDist", data.labels,
+        { values: data.glucose, name: "Glucose", unit: "mg/dL" },
+        [{ values: data.walking_running_distance, name: "Walk/Run Dist", unit: "mi", color: COLORS.walkRunDistance, showArea: true }]
+      );
+
+      // Placeholder charts for metrics with no data yet
+      renderPlaceholderChart("chartCyclingPower", "Cycling Power");
+      renderPlaceholderChart("chartCyclingSpeed", "Cycling Speed");
+    }
+
+    /* ==================================================================
+       Data Loading
+       ================================================================== */
+
+    /**
+     * Fetch all chart data from the backend for the given time range
+     * and render/update all charts. Called on page load and when the
+     * user clicks a time range button.
+     */
+    async function loadDashboard(range) {
+      currentRange = range || "7d";
+
+      // Update active state on time range buttons
+      document.querySelectorAll(".time-range-picker button").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.range === currentRange);
+      });
+
+      try {
+        const response = await fetch("/api/data?range=" + currentRange);
+        const data = await response.json();
+
+        if (data.labels.length === 0) {
+          // No data yet — show empty state message
+          return;
+        }
+
+        renderAllCharts(data);
+
+        // Update snapshot averages from the same data response
+        document.getElementById("snapshotGlucose").textContent =
+          data.avg_glucose != null ? data.avg_glucose : "--";
+        document.getElementById("snapshotSteps").textContent =
+          data.avg_daily_steps != null ? data.avg_daily_steps.toLocaleString() : "--";
+        document.getElementById("snapshotExercise").textContent =
+          data.avg_exercise_minutes != null ? data.avg_exercise_minutes : "--";
+        document.getElementById("snapshotRange").textContent =
+          "over " + data.range;
+      } catch (err) {
+        console.error("Failed to load dashboard data:", err);
+      }
+    }
+
+    /**
+     * Fetch and display Today's Snapshot card values.
+     * Shows "--" for any metric that has no data.
+     */
+    async function loadSnapshot() {
+      try {
+        const response = await fetch("/api/snapshot");
+        const data = await response.json();
+
+        document.getElementById("snapshotGlucose").textContent =
+          data.latest_glucose != null ? data.latest_glucose : "--";
+        document.getElementById("snapshotSteps").textContent =
+          data.total_steps != null ? data.total_steps.toLocaleString() : "--";
+        document.getElementById("snapshotExercise").textContent =
+          data.exercise_minutes != null ? data.exercise_minutes : "--";
+        document.getElementById("snapshotDate").textContent =
+          data.as_of ? "as of " + data.as_of : "";
+      } catch (err) {
+        console.error("Failed to load snapshot:", err);
+      }
+    }
+
+    /**
+     * Switch the global time range. Updates the active button state
+     * and re-fetches all chart data.
+     */
+    function switchRange(range) {
+      loadDashboard(range);
+    }
+
+    /* ==================================================================
+       Upload Modal
+       ================================================================== */
+
+    /** Show the upload modal overlay */
+    function openUploadModal() {
+      document.getElementById("uploadModal").style.display = "flex";
+      document.getElementById("uploadPassword").value = "";
+      document.getElementById("fileName").textContent = "";
+      document.getElementById("uploadProgress").style.display = "none";
+      document.getElementById("submitBtn").disabled = false;
+      document.getElementById("fileInput").value = "";
+    }
+
+    /** Hide the upload modal and reset its state */
+    function closeUploadModal() {
+      document.getElementById("uploadModal").style.display = "none";
+    }
+
+    /**
+     * Handle the upload form submission.
+     * Sends the zip file and password to /api/upload, shows progress,
+     * and refreshes the dashboard on success.
+     */
+    async function handleUpload(event) {
+      event.preventDefault();
+
+      const password = document.getElementById("uploadPassword").value;
+      const fileInput = document.getElementById("fileInput");
+      const statusEl = document.getElementById("uploadStatus");
+      const progressEl = document.getElementById("uploadProgress");
+      const submitBtn = document.getElementById("submitBtn");
+
+      if (!fileInput.files.length) {
+        statusEl.textContent = "Please select a file first.";
+        statusEl.className = "upload-status error";
+        progressEl.style.display = "block";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("password", password);
+      formData.append("file", fileInput.files[0]);
+
+      // Show progress indicator
+      progressEl.style.display = "block";
+      submitBtn.disabled = true;
+      statusEl.textContent = "Uploading and parsing... this may take a few minutes.";
+      statusEl.className = "upload-status";
+
+      try {
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+          statusEl.textContent = "Success! Imported " + result.records_imported.toLocaleString() + " records.";
+          statusEl.className = "upload-status success";
+
+          // Close modal after a brief delay and refresh dashboard
+          setTimeout(() => {
+            closeUploadModal();
+            loadDashboard(currentRange);
+          }, 2000);
+        } else {
+          statusEl.textContent = "Error: " + result.error;
+          statusEl.className = "upload-status error";
+          submitBtn.disabled = false;
+        }
+      } catch (err) {
+        statusEl.textContent = "Upload failed: " + err.message;
+        statusEl.className = "upload-status error";
+        submitBtn.disabled = false;
+      }
+    }
+
+    /* ==================================================================
+       Drag-and-Drop Handlers
+       Allow users to drag an export.zip onto the drop zone instead of
+       using the file browser.
+       ================================================================== */
+    document.addEventListener("DOMContentLoaded", function() {
+      const dropZone = document.getElementById("dropZone");
+      const fileInput = document.getElementById("fileInput");
+
+      /* Highlight drop zone when dragging over it */
+      dropZone.addEventListener("dragover", function(e) {
+        e.preventDefault();
+        dropZone.classList.add("drag-over");
+      });
+
+      dropZone.addEventListener("dragleave", function() {
+        dropZone.classList.remove("drag-over");
+      });
+
+      /* Handle file drop */
+      dropZone.addEventListener("drop", function(e) {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        if (e.dataTransfer.files.length > 0) {
+          fileInput.files = e.dataTransfer.files;
+          document.getElementById("fileName").textContent = e.dataTransfer.files[0].name;
+        }
+      });
+
+      /* Update file name display when file is selected via browser */
+      fileInput.addEventListener("change", function() {
+        if (fileInput.files.length > 0) {
+          document.getElementById("fileName").textContent = fileInput.files[0].name;
+        }
+      });
+
+      /* Also allow clicking the drop zone to open file browser */
+      dropZone.addEventListener("click", function(e) {
+        if (e.target.tagName !== "BUTTON") {
+          fileInput.click();
+        }
+      });
+    });
+
+    /* ==================================================================
+       Window Resize Handler
+       Resize all active ECharts instances when the browser window changes.
+       ================================================================== */
+    window.addEventListener("resize", function() {
+      Object.values(charts).forEach(chart => {
+        if (chart && chart.resize) chart.resize();
+      });
+    });
+
+    /* ==================================================================
+       Initialize
+       Load snapshot cards and dashboard data on page load.
+       ================================================================== */
+    document.addEventListener("DOMContentLoaded", function() {
+      loadDashboard("7d");
+    });
+  </script>
+</body>
+</html>
