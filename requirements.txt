@@ -1,0 +1,9 @@
+# Static Health Dashboard — Dependencies
+# Only the packages actually needed by the application.
+# numpy is a transitive dependency of pandas (installed automatically).
+# sqlite3 is part of the Python standard library.
+
+Flask==3.1.0
+pandas==2.2.3
+gunicorn==23.0.0
+python-dotenv==1.0.1
